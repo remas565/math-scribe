@@ -1,15 +1,22 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Copy, Check, Code2, Eye } from 'lucide-react';
+import { Copy, Check, Code2, Eye, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+interface LatencyInfo {
+  uploadTime: number;
+  processingTime: number;
+  totalTime: number;
+}
 
 interface ResultPanelProps {
   latex: string;
   isProcessing: boolean;
+  latency?: LatencyInfo | null;
 }
 
-export function ResultPanel({ latex, isProcessing }: ResultPanelProps) {
+export function ResultPanel({ latex, isProcessing, latency }: ResultPanelProps) {
   const [copied, setCopied] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
 
@@ -20,7 +27,6 @@ export function ResultPanel({ latex, isProcessing }: ResultPanelProps) {
   };
 
   const renderLatexPreview = (tex: string) => {
-    // Simple LaTeX to visual representation for common math symbols
     return tex
       .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1)/($2)')
       .replace(/\\sqrt\{([^}]+)\}/g, '√($1)')
@@ -99,6 +105,28 @@ export function ResultPanel({ latex, isProcessing }: ResultPanelProps) {
                 <p className="text-lg font-medium text-foreground">
                   {renderLatexPreview(latex)}
                 </p>
+              </div>
+            )}
+            {latency && (
+              <div className="p-3 rounded-xl bg-muted/50 border border-border">
+                <div className="flex items-center gap-2 mb-2">
+                  <Clock className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground">Performance Metrics</span>
+                </div>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <p className="text-muted-foreground text-xs">Upload Time</p>
+                    <p className="font-mono font-semibold text-foreground">{latency.uploadTime} ms</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">Processing Time</p>
+                    <p className="font-mono font-semibold text-foreground">{latency.processingTime} ms</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">Total Response</p>
+                    <p className="font-mono font-semibold text-primary">{latency.totalTime} ms</p>
+                  </div>
+                </div>
               </div>
             )}
           </div>
