@@ -3,9 +3,7 @@ import { Header } from '@/components/Header';
 import { UploadCard } from '@/components/UploadCard';
 import { ResultPanel } from '@/components/ResultPanel';
 import { HistoryPanel } from '@/components/HistoryPanel';
-import { SettingsPanel } from '@/components/SettingsPanel';
 import { LoggingPanel } from '@/components/LoggingPanel';
-import { InfoPanel } from '@/components/InfoPanel';
 import { toast } from '@/hooks/use-toast';
 
 interface HistoryItem {
@@ -22,85 +20,131 @@ interface LogEntry {
   message: string;
 }
 
+interface LatencyInfo {
+  uploadTime: number;
+  processingTime: number;
+  totalTime: number;
+}
+
+const API_URL = 'http://localhost:8000';
+
 const Index = () => {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [latex, setLatex] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  
-  // Settings state
-  const [model, setModel] = useState('mathpix-v3');
-  const [confidence, setConfidence] = useState(85);
-  const [preprocessing, setPreprocessing] = useState(true);
+  const [latency, setLatency] = useState<LatencyInfo | null>(null);
 
   const addLog = useCallback((type: LogEntry['type'], message: string) => {
-    setLogs(prev => [...prev, {
+    const entry = {
       id: crypto.randomUUID(),
       timestamp: new Date(),
       type,
       message,
-    }]);
+    };
+    setLogs(prev => [...prev, entry]);
+    return entry;
   }, []);
 
-  const handleImageUpload = useCallback((file: File) => {
+  const sendEvent = useCallback(async (eventType: string, data?: Record<string, unknown>) => {
+    try {
+      await fetch(`${API_URL}/event`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event: eventType, timestamp: new Date().toISOString(), ...data }),
+      });
+    } catch (err) {
+      console.warn('Failed to send event:', eventType);
+    }
+  }, []);
+
+  const handleImageUpload = useCallback(async (file: File) => {
+    const uploadStart = performance.now();
+    
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const imageUrl = e.target?.result as string;
+      const uploadEnd = performance.now();
+      const uploadTime = Math.round(uploadEnd - uploadStart);
+      
       setUploadedImage(imageUrl);
-      addLog('info', `Image uploaded: ${file.name}`);
-      
-      // Simulate OCR processing
+      setUploadedFile(file);
+      addLog('info', `Image uploaded: ${file.name} (${uploadTime}ms)`);
+      sendEvent('image_uploaded', { filename: file.name, uploadTime });
+
+      // Start OCR processing
       setIsProcessing(true);
-      addLog('info', `Starting OCR with ${model}...`);
+      setLatency(null);
+      addLog('info', 'Submitting to OCR backend...');
+      sendEvent('submitted_for_ocr');
       
-      if (preprocessing) {
-        addLog('info', 'Applying image preprocessing...');
-      }
+      const processingStart = performance.now();
       
-      setTimeout(() => {
-        addLog('info', 'Analyzing mathematical structures...');
-      }, 500);
-      
-      setTimeout(() => {
-        addLog('info', `Confidence threshold: ${confidence}%`);
-      }, 1000);
-      
-      setTimeout(() => {
-        // Simulated LaTeX output
-        const sampleLatex = [
-          '\\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}',
-          '\\int_{0}^{\\infty} e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2}',
-          '\\sum_{n=1}^{\\infty} \\frac{1}{n^2} = \\frac{\\pi^2}{6}',
-          'E = mc^2',
-          '\\nabla \\times \\vec{E} = -\\frac{\\partial \\vec{B}}{\\partial t}',
-        ];
-        const result = sampleLatex[Math.floor(Math.random() * sampleLatex.length)];
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const response = await fetch(`${API_URL}/predict`, {
+          method: 'POST',
+          body: formData,
+        });
+        
+        const processingEnd = performance.now();
+        const processingTime = Math.round(processingEnd - processingStart);
+        const totalTime = uploadTime + processingTime;
+        
+        if (!response.ok) {
+          throw new Error(`Server error: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        const result = data.latex || '';
         
         setLatex(result);
+        setLatency({ uploadTime, processingTime, totalTime });
         setIsProcessing(false);
-        addLog('success', 'LaTeX extraction complete');
+        addLog('success', `LaTeX extraction complete (${processingTime}ms)`);
+        sendEvent('ocr_success', { processingTime, totalTime });
         
         // Add to history
-        setHistory(prev => [{
+        const historyItem = {
           id: crypto.randomUUID(),
           latex: result,
           timestamp: new Date(),
           thumbnail: imageUrl,
-        }, ...prev].slice(0, 10));
+        };
+        setHistory(prev => [historyItem, ...prev].slice(0, 10));
+        sendEvent('history_entry_saved', { id: historyItem.id });
         
         toast({
           title: "Conversion Complete",
           description: "LaTeX has been extracted successfully.",
         });
-      }, 2000);
+      } catch (error) {
+        const processingEnd = performance.now();
+        const processingTime = Math.round(processingEnd - processingStart);
+        
+        setIsProcessing(false);
+        addLog('error', `OCR failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        sendEvent('ocr_failure', { error: String(error), processingTime });
+        
+        toast({
+          title: "OCR Failed",
+          description: "Could not connect to backend. Make sure FastAPI is running on localhost:8000",
+          variant: "destructive",
+        });
+      }
     };
     reader.readAsDataURL(file);
-  }, [model, confidence, preprocessing, addLog]);
+  }, [addLog, sendEvent]);
 
   const handleClear = useCallback(() => {
     setUploadedImage(null);
+    setUploadedFile(null);
     setLatex('');
+    setLatency(null);
     addLog('info', 'Cleared current image');
   }, [addLog]);
 
@@ -109,6 +153,7 @@ const Index = () => {
     if (item.thumbnail) {
       setUploadedImage(item.thumbnail);
     }
+    setLatency(null);
     addLog('info', 'Loaded from history');
   }, [addLog]);
 
@@ -142,6 +187,7 @@ const Index = () => {
             <ResultPanel
               latex={latex}
               isProcessing={isProcessing}
+              latency={latency}
             />
             
             <HistoryPanel
@@ -152,20 +198,9 @@ const Index = () => {
             />
           </div>
           
-          {/* Controls Sidebar - Right Column */}
+          {/* Logs Sidebar - Right Column */}
           <div className="space-y-6">
-            <SettingsPanel
-              model={model}
-              onModelChange={setModel}
-              confidence={confidence}
-              onConfidenceChange={setConfidence}
-              preprocessing={preprocessing}
-              onPreprocessingChange={setPreprocessing}
-            />
-            
             <LoggingPanel logs={logs} />
-            
-            <InfoPanel />
           </div>
         </div>
       </main>
