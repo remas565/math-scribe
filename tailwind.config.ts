@@ -14,7 +14,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        sans: ['Poppins', 'Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        mono: ['Monaco', 'Menlo', 'Ubuntu Mono', 'monospace'],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -64,19 +65,28 @@ export default {
           bg: "hsl(var(--console-bg))",
           text: "hsl(var(--console-text))",
           accent: "hsl(var(--console-accent))",
+          glow: "hsl(var(--console-glow))",
         },
+        // Playful palette
+        lavender: "hsl(var(--lavender))",
+        "soft-blue": "hsl(var(--soft-blue))",
+        lemon: "hsl(var(--lemon))",
+        mint: "hsl(var(--mint))",
+        blush: "hsl(var(--blush))",
       },
       borderRadius: {
         lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        md: "calc(var(--radius) - 4px)",
+        sm: "calc(var(--radius) - 8px)",
         xl: "calc(var(--radius) + 4px)",
         "2xl": "calc(var(--radius) + 8px)",
+        "3xl": "calc(var(--radius) + 16px)",
       },
       boxShadow: {
         soft: "var(--shadow-soft)",
         medium: "var(--shadow-medium)",
         glow: "var(--shadow-glow)",
+        card: "var(--shadow-card)",
       },
       keyframes: {
         "accordion-down": {
@@ -91,11 +101,21 @@ export default {
           "0%": { backgroundPosition: "-200% 0" },
           "100%": { backgroundPosition: "200% 0" },
         },
+        bounce: {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-8px)" },
+        },
+        "spin-slow": {
+          "0%": { transform: "rotate(0deg)" },
+          "100%": { transform: "rotate(360deg)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         shimmer: "shimmer 2s linear infinite",
+        bounce: "bounce 1s ease-in-out infinite",
+        "spin-slow": "spin-slow 8s linear infinite",
       },
     },
   },
